@@ -10,17 +10,20 @@ from PyQt5.QtCore import QByteArray
 from PyQt5.Qt import QSize
 from PyQt5 import QtCore, QtGui
 from PyQt5.QtCore import Qt
+from PIL import Image
 import imageio
 from random import randint
 
-gifFile = "ex.gif"
+
 class GifPlayer(QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, name, parent=None):
         QWidget.__init__(self, parent)
 
-        self.movie = QMovie('ex.gif', QByteArray(), self)
+        self.movie = QMovie(name, QByteArray(), self)
         size = self.movie.scaledSize()
-        self.setGeometry(200, 200, size.width(), size.height())
+        print(size)
+        self.setGeometry(0, 0, size.width(), size.height())
+        self.im = Image.open(name).size
         self.movie_screen = QLabel()
         self.movie_screen.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.movie_screen.setAlignment(Qt.AlignCenter)
@@ -32,16 +35,29 @@ class GifPlayer(QWidget):
         self.movie.start()
         self.movie.loopCount()
 
-        button = QPushButton('refresh gif', self)
-        button.setToolTip('This is an example button')
-        button.move(10,10)
-        button.clicked.connect(self.change)
+        self.btn_s = QPushButton('Scale', self)
+        self.btn_s.resize(80, 25)
+        self.btn_s.move(0, 460)
+        self.btn_s.clicked.connect(self.resizeGIF)
 
-    def change(self, name):
-        self.movie = QMovie(name,QByteArray(), self)
-        self.movie_screen.setMovie(self.movie)
-        self.movie.start()
-        print("done")
+    def resizeGIF(self):
+        try:
+            rect = self.geometry()
+            w = rect.width()
+            h = rect.height()
+            w1, h1 = self.im
+            print(w, h, w1, h1)
+            if w > 20 and h > 20:
+                w -= 20
+                h -= 20
+            k = h1 / h
+            w = w1 / k
+            size = QtCore.QSize(int(w), h)
+
+            movie = self.movie_screen.movie()
+            movie.setScaledSize(size)
+        except Exception as er:
+            print(er)
 
 
 class Editor(QMainWindow):
@@ -133,8 +149,6 @@ class Editor(QMainWindow):
         self.setWindowTitle('GIF-editor')
         self.setFixedSize(self.size())
 
-
-
         # работа со списком изображений
         self.lst = QListWidget(self)
         self.lst.move(150, 40)
@@ -149,17 +163,18 @@ class Editor(QMainWindow):
         pal.setColor(QtGui.QPalette.Inactive, QtGui.QPalette.Background, QtGui.QColor("#FFF8E7"))
         self.setPalette(pal)
 
-        #tabwidget
+        # tabwidget
         _translate = QtCore.QCoreApplication.translate
         self.tabWidget = QTabWidget(self)
         self.tabWidget.setGeometry(QtCore.QRect(120, 25, 670, 510))
         self.tabWidget.addTab(self.lst, "")
-        self.res_display = GifPlayer()
 
+        self.res_display = GifPlayer('ex.gif')
         self.tabWidget.addTab(self.res_display, "")
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.lst), _translate("Form", "Frames"))
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.res_display), _translate("Form", "Result"))
 
+        # Масштабирование
         self.slider = QSlider(QtCore.Qt.Horizontal, self)
         self.slider.setFocusPolicy(QtCore.Qt.StrongFocus)
         self.slider.setTickPosition(QSlider.TicksBothSides)
@@ -238,8 +253,14 @@ class Editor(QMainWindow):
                 if i == '':
                     i = 'image' + str(randint(10000000, 99999999))
                 path += '/' + i + '.gif'
-            print(path)
+
+            _translate = QtCore.QCoreApplication.translate
             self.work(path)
+            self.tabWidget.removeTab(1)
+            self.res_display = GifPlayer(path)
+            self.tabWidget.addTab(self.res_display, "")
+            self.tabWidget.setTabText(self.tabWidget.indexOf(self.lst), _translate("Form", "Frames"))
+            self.tabWidget.setTabText(self.tabWidget.indexOf(self.res_display), _translate("Form", "Result"))
 
     def work(self, path):
         try:
