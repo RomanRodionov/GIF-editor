@@ -21,7 +21,6 @@ class GifPlayer(QWidget):
 
         self.movie = QMovie(name, QByteArray(), self)
         size = self.movie.scaledSize()
-        print(size)
         self.setGeometry(0, 0, size.width(), size.height())
         self.im = Image.open(name).size
         self.movie_screen = QLabel()
@@ -51,7 +50,6 @@ class GifPlayer(QWidget):
             w = rect.width()
             h = rect.height()
             w1, h1 = self.im
-            print(w, h, w1, h1)
             if w > 20 and h > 20:
                 w -= 20
                 h -= 20
@@ -206,6 +204,8 @@ class Editor(QMainWindow):
         pal = self.palette()
         pal.setBrush(QtGui.QPalette.Normal, QtGui.QPalette.Background,
                      QtGui.QBrush(QtGui.QPixmap("bg.png")))
+        pal.setBrush(QtGui.QPalette.Inactive, QtGui.QPalette.Background,
+                     QtGui.QBrush(QtGui.QPixmap("bg2.png")))
         self.setPalette(pal)
         # Ссылка на изображение: https://wallscloud.net/wallpaper/textures/Siniy-Fon/qLj7
 
@@ -218,10 +218,6 @@ class Editor(QMainWindow):
         pal = self.palette()
 
         self.buffer = []
-
-        #pal.setColor(QtGui.QPalette.Normal, QtGui.QPalette.Background, QtGui.QColor("#778899"))
-        #pal.setColor(QtGui.QPalette.Inactive, QtGui.QPalette.Background, QtGui.QColor("#778899"))
-        #self.setPalette(pal)
 
         # tabwidget
         _translate = QtCore.QCoreApplication.translate
@@ -262,10 +258,15 @@ class Editor(QMainWindow):
     # Функция вставки фрэйма из буфера обмена
     def paste(self):
         try:
-            ch_item = self.lst.selectedItems()[0]
-            if self.buffer:
+            if self.lst.count() > 0:
+                ch_item = self.lst.selectedItems()[0]
+                if self.buffer:
+                    for item in self.buffer:
+                        self.lst.insertItem(self.lst.row(ch_item), item.clone())
+            else:
                 for item in self.buffer:
-                    self.lst.insertItem(self.lst.row(ch_item), item.clone())
+                    self.lst.addItem(item)
+
         except Exception as a:
             print(a)
 
@@ -337,12 +338,13 @@ class Editor(QMainWindow):
     def work(self, path):
         try:
             images = list(map(lambda filename: imageio.imread(filename), self.get_lst()))
-            imageio.mimsave(path, images, palettesize=self.quality, duration=float(self.duration_input.text()))
+            imageio.mimsave(path, images, 'GIF-FI', quantizer='nq', palettesize=self.quality, duration=float(self.duration_input.text()))
         except Exception as er:
             print(er)
 
 
 if __name__ == '__main__':
+
     app = QApplication(sys.argv)
     ex = Editor()
     sys.exit(app.exec_())
