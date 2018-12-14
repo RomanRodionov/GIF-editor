@@ -4,7 +4,7 @@
 import sys
 from PyQt5.QtWidgets import (QSlider, QWidget, QTabWidget, QListWidget, QListWidgetItem, QComboBox, QMainWindow,
                              QLineEdit, QLabel, QAction, QFileDialog, QApplication, QPushButton, QInputDialog,
-                             QVBoxLayout, QSizePolicy)
+                             QVBoxLayout, QSizePolicy, QAbstractItemView, QToolBar)
 from PyQt5.QtGui import QIcon, QMovie
 from PyQt5.QtCore import QByteArray, Qt
 from PyQt5.Qt import QSize
@@ -14,7 +14,115 @@ import imageio
 from random import randint
 
 
-#Код класс GifPlayer, который создает и проигрывает гиф-изображение
+class SettingMenu(QWidget):
+    def __init__(self, parent):
+        QWidget.__init__(self)
+        self.parent = parent
+        self.quality = parent.quality
+        self.setGeometry(250, 250, 270, 150)
+        self.setWindowTitle('Settings')
+        self.setFixedSize(self.size())
+        self.setWindowIcon(QtGui.QIcon('icons/settings.png'))
+        pal = self.palette()
+        pal.setBrush(QtGui.QPalette.Normal, QtGui.QPalette.Background,
+                     QtGui.QBrush(QtGui.QPixmap("bg.png")))
+        pal.setBrush(QtGui.QPalette.Inactive, QtGui.QPalette.Background,
+                     QtGui.QBrush(QtGui.QPixmap("bg2.png")))
+        self.setPalette(pal)
+
+        self.t1 = QLabel(self)
+        self.t1.setText("Duration time:")
+        self.t1.move(140, 15)
+        self.t1.setStyleSheet("""
+            QLabel { color: white }
+        """)
+
+        self.t2 = QLabel(self)
+        self.t2.setText("Pallet size:")
+        self.t2.move(15, 15)
+        self.t2.setStyleSheet("""
+                    QLabel { color: white }
+                """)
+        self.gif_palette = QComboBox(self)
+        self.gif_palette.addItems(["256", "128",
+                                   "64", "32", "16", "8", "4", "2"])
+        index = self.gif_palette.findText(str(self.parent.quality), QtCore.Qt.MatchFixedString)
+        if index >= 0:
+            self.gif_palette.setCurrentIndex(index)
+
+        self.gif_palette.move(15, 40)
+        self.gif_palette.resize(80, 25)
+        self.gif_palette.setStyleSheet("""
+                    QComboBox:hover { background-color: red; color: white }
+                    QComboBox:!hover { background-color: rgb(105, 105, 105); color: white }
+                    QComboBox:pressed { background-color: rgb(205, 92, 92); color: white }
+                """)
+
+        self.duration_input = QLineEdit(self)
+        self.duration_input.move(140, 40)
+        self.duration_input.resize(80, 25)
+        self.duration_input.setText(str(self.parent.duration))
+        self.duration_input.setStyleSheet("""
+            QLineEdit:hover { background-color: red; color: white }
+            QLineEdit:!hover { background-color: rgb(105, 105, 105); color: white }
+        """)
+        self.btn_r = QPushButton('OK', self)
+        self.btn_r.resize(80, 25)
+        self.btn_r.move(15, 100)
+        self.btn_r.clicked.connect(self.ok)
+        self.btn_r.setStyleSheet("""
+    QPushButton:hover { background-color: red; color: white }
+    QPushButton:!hover { background-color: rgb(105, 105, 105); color: white }
+    QPushButton:pressed { background-color: rgb(205, 92, 92); color: white }
+""")
+
+        self.gif_palette.activated[str].connect(self.ch_pal)
+        self.show()
+
+    # Изменение количества цветов в палитре гиф-изображения
+    def ch_pal(self, text):
+        self.quality = int(text)
+
+    def ok(self):
+        try:
+            n = float(self.duration_input.text())
+            self.parent.duration = n
+            self.parent.quality = self.quality
+            self.close()
+        except Exception:
+            pass
+
+
+class ListOfFrames(QListWidget):
+    def __init__(self, parent):
+        super(ListOfFrames, self).__init__(parent)
+        self.setAcceptDrops(True)
+        self.setDragDropMode(QAbstractItemView.InternalMove)
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+        else:
+            super(ListOfFrames, self).dragEnterEvent(event)
+
+    def dragMoveEvent(self, event):
+        super(ListOfFrames, self).dragMoveEvent(event)
+
+    def dropEvent(self, event):
+        if event.mimeData().hasUrls():
+            for url in event.mimeData().urls():
+                name = url.path()[1::]
+                if name:
+                    if name.endswith(('.jpeg', '.png', '.gif', '.jpg', '.JPEG', '.PNG', '.GIF', '.JPG')):
+                        item = QListWidgetItem(name)
+                        item.setIcon(QIcon(name))
+                        self.addItem(item)
+            event.acceptProposedAction()
+        else:
+            super(ListOfFrames, self).dropEvent(event)
+
+
+# Код класс GifPlayer, который проигрывает гиф-изображение
 class GifPlayer(QWidget):
     def __init__(self, name, parent=None):
         QWidget.__init__(self, parent)
@@ -43,7 +151,8 @@ class GifPlayer(QWidget):
     QPushButton:!hover { background-color: rgb(105, 105, 105); color: white }
     QPushButton:pressed { background-color: rgb(205, 92, 92); color: white }
 """)
-    #Этот метод меняет разрешение гиф-анимации в окне result
+
+    # Этот метод меняет разрешение гиф-анимации в окне result
     def resizeGIF(self):
         try:
             rect = self.geometry()
@@ -62,6 +171,7 @@ class GifPlayer(QWidget):
         except Exception as er:
             print(er)
 
+
 # Код класса оконного приложения
 class Editor(QMainWindow):
     def __init__(self):
@@ -73,69 +183,60 @@ class Editor(QMainWindow):
         self.statusBar()
 
         self.quality = 256
-        self.gif_palette = QComboBox(self)
-        self.gif_palette.addItems(["256", "128",
-                                   "64", "32", "16", "8", "4", "2"])
+        self.duration = 0.2
 
-        self.gif_palette.move(15, 250)
-        self.gif_palette.resize(80, 25)
-        self.gif_palette.setStyleSheet("""
-    QComboBox:hover { background-color: red; color: white }
-    QComboBox:!hover { background-color: rgb(105, 105, 105); color: white }
-    QComboBox:pressed { background-color: rgb(205, 92, 92); color: white }
-""")
-
-        self.gif_palette.activated[str].connect(self.ch_pal)
         self.path_to_add = '/home'
         self.path_to_save = '/home'
+
+        tlb = QToolBar('ToolBar')
+        tlb.setIconSize(QSize(48, 48))
+
+        saveAct = QAction(QIcon('icons/save.png'), 'Save', self)
+        saveAct.setShortcut('Ctrl+O')
+        saveAct.triggered.connect(self.save)
+        tlb.addAction(saveAct)
+
+        cleanAct = QAction(QIcon('icons/clean.png'), 'Clean', self)
+        cleanAct.setShortcut('Ctrl+O')
+        cleanAct.triggered.connect(self.clean)
+        tlb.addAction(cleanAct)
+
+        addAct = QAction(QIcon('icons/add.png'), 'Add', self)
+        addAct.setShortcut('Ctrl+O')
+        addAct.triggered.connect(self.add)
+        tlb.addAction(addAct)
+
+        delAct = QAction(QIcon('icons/delete.png'), 'Delete', self)
+        delAct.setShortcut('Ctrl+O')
+        delAct.triggered.connect(self.delete)
+        tlb.addAction(delAct)
+
+        remAct = QAction(QIcon('icons/remove.png'), 'Remove', self)
+        remAct.setShortcut('Ctrl+O')
+        remAct.triggered.connect(self.remove)
+        tlb.addAction(remAct)
+
+        copyAct = QAction(QIcon('icons/copy.png'), 'Copy', self)
+        copyAct.setShortcut('Ctrl+O')
+        copyAct.triggered.connect(self.copy)
+        tlb.addAction(copyAct)
+
+        pasteAct = QAction(QIcon('icons/paste.png'), 'Paste', self)
+        pasteAct.setShortcut('Ctrl+O')
+        pasteAct.triggered.connect(self.paste)
+        tlb.addAction(pasteAct)
+
+        setAct = QAction(QIcon('icons/settings.png'), 'Settings', self)
+        setAct.setShortcut('Ctrl+O')
+        setAct.triggered.connect(self.settings)
+        tlb.addAction(setAct)
+
+        self.toolbar = self.addToolBar(Qt.LeftToolBarArea, tlb)
 
         addFile = QAction(QIcon('open.png'), 'Add', self)
         addFile.setShortcut('Ctrl+O')
         addFile.setStatusTip('Add frame')
         addFile.triggered.connect(self.add)
-
-#Кнопки для работы с программой
-        self.btn = QPushButton('Save...', self)
-        self.btn.resize(80, 25)
-        self.btn.move(15, 460)
-        self.btn.clicked.connect(self.save)
-
-        self.btn_cl = QPushButton('Clean', self)
-        self.btn_cl.resize(80, 25)
-        self.btn_cl.move(15, 420)
-        self.btn_cl.clicked.connect(self.clean)
-
-        self.btn_a = QPushButton('Add...', self)
-        self.btn_a.resize(80, 25)
-        self.btn_a.move(15, 380)
-        self.btn_a.clicked.connect(self.add)
-
-        self.btn_d = QPushButton('Delete', self)
-        self.btn_d.resize(80, 25)
-        self.btn_d.move(15, 60)
-        self.btn_d.clicked.connect(self.delete)
-
-        self.btn_r = QPushButton('Remove', self)
-        self.btn_r.resize(80, 25)
-        self.btn_r.move(15, 100)
-        self.btn_r.clicked.connect(self.remove)
-
-        self.btn_c = QPushButton('Copy', self)
-        self.btn_c.resize(80, 25)
-        self.btn_c.move(15, 140)
-        self.btn_c.clicked.connect(self.copy)
-
-        self.btn_p = QPushButton('Paste', self)
-        self.btn_p.resize(80, 25)
-        self.btn_p.move(15, 180)
-        self.btn_p.clicked.connect(self.paste)
-
-        for button in [self.btn, self.btn_a, self.btn_c, self.btn_cl, self.btn_d, self.btn_p, self.btn_r, self.btn]:
-            button.setStyleSheet("""
-    QPushButton:hover { background-color: red; color: white }
-    QPushButton:!hover { background-color: rgb(105, 105, 105); color: white }
-    QPushButton:pressed { background-color: rgb(205, 92, 92); color: white }
-""")
 
         saveFile = QAction(QIcon('save.png'), 'Save', self)
         saveFile.setShortcut('Ctrl+S')
@@ -174,30 +275,7 @@ class Editor(QMainWindow):
         fileMenu = menubar.addMenu('&Save')
         fileMenu.addAction(saveFile)
 
-        self.t1 = QLabel(self)
-        self.t1.setText("Duration time:")
-        self.t1.move(15, 290)
-        self.t1.setStyleSheet("""
-    QLabel { color: white }
-""")
-
-        self.t2 = QLabel(self)
-        self.t2.setText("Pallet size:")
-        self.t2.move(15, 210)
-        self.t2.setStyleSheet("""
-            QLabel { color: white }
-        """)
-
-        self.duration_input = QLineEdit(self)
-        self.duration_input.move(15, 330)
-        self.duration_input.resize(80, 25)
-        self.duration_input.setText('0.1')
-        self.duration_input.setStyleSheet("""
-    QLineEdit:hover { background-color: red; color: white }
-    QLineEdit:!hover { background-color: rgb(105, 105, 105); color: white }
-""")
-
-        self.setGeometry(300, 300, 810, 575)
+        self.setGeometry(300, 300, 790, 575)
         self.setWindowTitle('GIF-editor')
         self.setFixedSize(self.size())
         self.setWindowIcon(QtGui.QIcon('icon.png'))
@@ -210,7 +288,7 @@ class Editor(QMainWindow):
         # Ссылка на изображение: https://wallscloud.net/wallpaper/textures/Siniy-Fon/qLj7
 
         # работа со списком изображений
-        self.lst = QListWidget(self)
+        self.lst = ListOfFrames(self)
         self.lst.move(150, 40)
         self.lst.resize(400, 450)
         self.lst.setIconSize(QSize(90, 90))
@@ -222,7 +300,7 @@ class Editor(QMainWindow):
         # tabwidget
         _translate = QtCore.QCoreApplication.translate
         self.tabWidget = QTabWidget(self)
-        self.tabWidget.setGeometry(QtCore.QRect(120, 25, 670, 510))
+        self.tabWidget.setGeometry(QtCore.QRect(75, 25, 690, 510))
         self.tabWidget.setStyleSheet(" background-color: rgb(233, 233, 233) ")
         self.tabWidget.addTab(self.lst, "")
 
@@ -236,14 +314,20 @@ class Editor(QMainWindow):
         self.slider.setFocusPolicy(QtCore.Qt.StrongFocus)
         self.slider.setTickPosition(QSlider.TicksBothSides)
         self.slider.setValue(20)
-        self.slider.move(700, 540)
+        self.slider.move(650, 540)
         self.slider.valueChanged.connect(self.change_slider)
 
         self.show()
 
+    def settings(self):
+        try:
+            self.wind = SettingMenu(self)
+        except Exception as a:
+            print(a)
+
     # Изменение размера иконок во вкладке Frames
     def change_slider(self):
-        value = self.slider.value() * 6
+        value = self.slider.value() * 4 + 15
         self.lst.setIconSize(QSize(value, value))
 
     # Функция сохранения фрэйма в буфер обмена
@@ -282,10 +366,6 @@ class Editor(QMainWindow):
             items.append(self.lst.item(index).text())
         return items
 
-    # Изменение количества цветов в палитре гиф-изображения
-    def ch_pal(self, text):
-        self.quality = int(text)
-
     # Функция удаления всех фреймов из вкладки Frames
     def clean(self):
         self.lst.clear()
@@ -303,7 +383,7 @@ class Editor(QMainWindow):
         name = False
         name = QFileDialog.getOpenFileName(self, 'Choose file', self.path_to_add)[0]
         if name:
-            if name.endswith(('.jpeg', '.png', '.gif', '.jpg')):
+            if name.endswith(('.jpeg', '.png', '.gif', '.jpg', '.JPEG', '.PNG', '.GIF', '.JPG')):
                 item = QListWidgetItem(name)
                 item.setIcon(QIcon(name))
                 self.lst.addItem(item)
@@ -334,17 +414,16 @@ class Editor(QMainWindow):
             self.tabWidget.setTabText(self.tabWidget.indexOf(self.lst), _translate("Form", "Frames"))
             self.tabWidget.setTabText(self.tabWidget.indexOf(self.res_display), _translate("Form", "Result"))
 
-
     def work(self, path):
         try:
             images = list(map(lambda filename: imageio.imread(filename), self.get_lst()))
-            imageio.mimsave(path, images, 'GIF-FI', quantizer='nq', palettesize=self.quality, duration=float(self.duration_input.text()))
+            imageio.mimsave(path, images, palettesize=self.quality,
+                            duration=float(self.duration))
         except Exception as er:
             print(er)
 
 
 if __name__ == '__main__':
-
     app = QApplication(sys.argv)
     ex = Editor()
     sys.exit(app.exec_())
