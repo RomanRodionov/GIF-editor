@@ -12,6 +12,7 @@ from PyQt5 import QtCore, QtGui
 from PIL import Image
 import imageio
 from random import randint
+import tempfile
 
 
 class SettingMenu(QWidget):
@@ -192,42 +193,42 @@ class Editor(QMainWindow):
         tlb.setIconSize(QSize(48, 48))
 
         saveAct = QAction(QIcon('icons/save.png'), 'Save', self)
-        saveAct.setShortcut('Ctrl+O')
         saveAct.triggered.connect(self.save)
         tlb.addAction(saveAct)
 
         cleanAct = QAction(QIcon('icons/clean.png'), 'Clean', self)
-        cleanAct.setShortcut('Ctrl+O')
         cleanAct.triggered.connect(self.clean)
         tlb.addAction(cleanAct)
 
+        playAct = QAction(QIcon('icons/play.png'), 'Play', self)
+        playAct.triggered.connect(self.play)
+        tlb.addAction(playAct)
+
         addAct = QAction(QIcon('icons/add.png'), 'Add', self)
-        addAct.setShortcut('Ctrl+O')
         addAct.triggered.connect(self.add)
         tlb.addAction(addAct)
 
         delAct = QAction(QIcon('icons/delete.png'), 'Delete', self)
-        delAct.setShortcut('Ctrl+O')
+        delAct.setShortcut('Backspace')
         delAct.triggered.connect(self.delete)
         tlb.addAction(delAct)
 
         remAct = QAction(QIcon('icons/remove.png'), 'Remove', self)
-        remAct.setShortcut('Ctrl+O')
+        remAct.setShortcut('Ctrl+X')
         remAct.triggered.connect(self.remove)
         tlb.addAction(remAct)
 
         copyAct = QAction(QIcon('icons/copy.png'), 'Copy', self)
-        copyAct.setShortcut('Ctrl+O')
+        copyAct.setShortcut('Ctrl+C')
         copyAct.triggered.connect(self.copy)
         tlb.addAction(copyAct)
 
         pasteAct = QAction(QIcon('icons/paste.png'), 'Paste', self)
-        pasteAct.setShortcut('Ctrl+O')
+        pasteAct.setShortcut('Ctrl+V')
         pasteAct.triggered.connect(self.paste)
         tlb.addAction(pasteAct)
 
         setAct = QAction(QIcon('icons/settings.png'), 'Settings', self)
-        setAct.setShortcut('Ctrl+O')
         setAct.triggered.connect(self.settings)
         tlb.addAction(setAct)
 
@@ -297,6 +298,14 @@ class Editor(QMainWindow):
 
         self.buffer = []
 
+        # Масштабирование
+        self.slider = QSlider(QtCore.Qt.Horizontal, self)
+        self.slider.setFocusPolicy(QtCore.Qt.StrongFocus)
+        self.slider.setTickPosition(QSlider.TicksBothSides)
+        self.slider.setValue(20)
+        self.slider.move(650, 540)
+        self.slider.valueChanged.connect(self.change_slider)
+
         # tabwidget
         _translate = QtCore.QCoreApplication.translate
         self.tabWidget = QTabWidget(self)
@@ -308,14 +317,6 @@ class Editor(QMainWindow):
         self.tabWidget.addTab(self.res_display, "")
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.lst), _translate("Form", "Frames"))
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.res_display), _translate("Form", "Result"))
-
-        # Масштабирование
-        self.slider = QSlider(QtCore.Qt.Horizontal, self)
-        self.slider.setFocusPolicy(QtCore.Qt.StrongFocus)
-        self.slider.setTickPosition(QSlider.TicksBothSides)
-        self.slider.setValue(20)
-        self.slider.move(650, 540)
-        self.slider.valueChanged.connect(self.change_slider)
 
         self.show()
 
@@ -390,21 +391,25 @@ class Editor(QMainWindow):
                 self.path_to_add = name
 
     # Функция создания гиф-файла и сохранения в директории
-    def save(self):
-        path = False
-        path = QFileDialog.getExistingDirectory(self, 'Choose directory', self.path_to_save)
+    def save(self, path=False, ch=True):
+        if not path:
+            path = QFileDialog.getExistingDirectory(self, 'Choose directory', self.path_to_save)
         if path:
-            self.path_to_save = path
-            i, okBtnPressed = QInputDialog.getText(
-                self, "Write name", "Save"
-            )
-            if okBtnPressed:
-                if len(i) >= 4:
-                    if i[-4:] == '.gif':
-                        i = i[0:-4]
-                if i == '':
-                    i = 'image' + str(randint(10000000, 99999999))
-                path += '/' + i + '.gif'
+            if ch:
+                self.path_to_save = path
+                i, okBtnPressed = QInputDialog.getText(
+                    self, "Write name", "Save"
+                )
+                if okBtnPressed:
+                    if len(i) >= 4:
+                        if i[-4:] == '.gif':
+                            i = i[0:-4]
+                    if i == '':
+                        i = 'image' + str(randint(10000000, 99999999))
+                    path += '/' + i + '.gif'
+            else:
+                directory = tempfile.mkdtemp()
+                path = directory + '/image.gif'
 
             _translate = QtCore.QCoreApplication.translate
             self.work(path)
@@ -413,6 +418,12 @@ class Editor(QMainWindow):
             self.tabWidget.addTab(self.res_display, "")
             self.tabWidget.setTabText(self.tabWidget.indexOf(self.lst), _translate("Form", "Frames"))
             self.tabWidget.setTabText(self.tabWidget.indexOf(self.res_display), _translate("Form", "Result"))
+
+    def play(self):
+        try:
+            self.save(True, False)
+        except Exception:
+            pass
 
     def work(self, path):
         try:
