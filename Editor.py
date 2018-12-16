@@ -235,14 +235,17 @@ class Editor(QMainWindow):
         self.toolbar = self.addToolBar(Qt.LeftToolBarArea, tlb)
 
         addFile = QAction(QIcon('open.png'), 'Add', self)
-        addFile.setShortcut('Ctrl+O')
         addFile.setStatusTip('Add frame')
         addFile.triggered.connect(self.add)
 
         saveFile = QAction(QIcon('save.png'), 'Save', self)
-        saveFile.setShortcut('Ctrl+S')
         saveFile.setStatusTip('Save GIF')
         saveFile.triggered.connect(self.save)
+
+        sett = QAction(QIcon('settings.png'), 'Settings', self)
+        sett.setStatusTip('Settings')
+        sett.triggered.connect(self.settings)
+
         menubar = self.menuBar()
         self.setStyleSheet("""
                 QMenuBar {
@@ -275,6 +278,8 @@ class Editor(QMainWindow):
         fileMenu.addAction(addFile)
         fileMenu = menubar.addMenu('&Save')
         fileMenu.addAction(saveFile)
+        fileMenu = menubar.addMenu('&Settings')
+        fileMenu.addAction(sett)
 
         self.setGeometry(300, 300, 790, 575)
         self.setWindowTitle('GIF-editor')
